@@ -63,8 +63,27 @@ need to access sensor data at certain times, in certain locations or under certa
 circumstances.
 
 \section{Introduction}
+Much of our increasingly-automated infrastructure relies on small, internet-connected devices, or the so-called ``Industrial Internet of Things'' (IIoT).\footnote{As this class project is, with instructor approval, a portion
+of the research work toward Steve's Ph.D. dissertation, the text in the introduction section and other areas in this report is quoted from his research work in progress on this topic without further explicit reference, as this is considered all part of the same research work being done, and the results of this project will eventually be incorporated into the published papers and dissertation work as well.}
+Among the numerous protocols used to enable these technologies to function is the MQ Telemetry Transport protocol (MQTT). This is a simple,
+lightweight plaintext message passing protocol which is designed to put a low overhead on small, low-power devices. As a result, it does not by default
+support encryption, authentication, message integrity validation, or access controls. It is an example of a ``publisher/subscriber'' system 
+(commonly ``pub/sub'' for short) where sensor devices collect readings and other telemetry data as ``topic publishers'', sending them to a central broker service. This, in turn, retransmits the telemetry data to client systems, other servers, or even other IoT devices such as device controllers which
+``subscribe'' to that data. Further, other independent agents which are in control of, e.g., automated building systems, publish messages to devices to adjust
+building airflow or activate door locks or whatever other device tasks they are in charge of, all through MQTT messages moving through the system.
+
 \section{Related Work}
-{\color{red}I have a bunch of content to paste in here from my thesis work\dots}
+The quest to effectively and efficiently manage subscriber access to published data (as well as the authority for publishers to provide that
+data) is not new, and a number of approaches have been proposed to date. In their 2023 paper \cite{ma2022tbac}, Ma and Yang describe a topic
+oriented model which grants access to certain subscribers according to which topics they are allowed to see.  Additionally, Xie, Shi, et al. pointed
+out \cite{xie2020topic} another important consideration for managing such access controls---dynamic rulesets. Their controls were based on the idea
+of mapping a set of users, devices, and topics via rules as to which actors can publish or subscribe to which topics.
+
+\subsection{Colombo \& Ferrari 2018}
+In their previous work \cite{colombo2018access}, Colombo \& Ferrari proposed a design for an access control manager proxy which can be deployed into an MQTT message broker to enforce
+a set of policies, possibly even causing messages to be rerouted to specific subscribers, held, or dropped entirely per those policy decisions.
+
+
 \section{Project Description}
 Our project seeks to add fine-grained, high-performance access control to MQTT
 pub/sub message broker systems for IoT networks.
