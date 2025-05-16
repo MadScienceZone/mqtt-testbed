@@ -5,7 +5,9 @@
 % https://www.acm.org/publications/proceedings-template
 % The ACM Latex guide provides further information about the ACM template
 \documentclass[sigconf, nonacm]{acmart}
+\bibliographystyle{ACM-Reference-Format}
 \usepackage{xcolor}
+\usepackage[normalem]{ulem}
 \definecolor{ontrack}{HTML}{4A6741}
 \definecolor{behind}{HTML}{8F1402}
 
@@ -75,11 +77,11 @@ building airflow or activate door locks or whatever other device tasks they are 
 \section{Related Work}
 The quest to effectively and efficiently manage subscriber access to published data (as well as the authority for publishers to provide that
 data) is not new, and a number of approaches have been proposed to date. In their 2023 paper \cite{ma2022tbac}, Ma and Yang describe a topic
-oriented model which grants access to certain subscribers according to which topics they are allowed to see.  Additionally, Xie, Shi, et al. pointed
+oriented model which grants access to certain subscribers according to which topics they are allowed to see.  \sout{Additionally, Xie, Shi, et al. pointed
 out \cite{xie2020topic} another important consideration for managing such access controls---dynamic rulesets. Their controls were based on the idea
-of mapping a set of users, devices, and topics via rules as to which actors can publish or subscribe to which topics.
+of mapping a set of users, devices, and topics via rules as to which actors can publish or subscribe to which topics.}
+{\color{red}maybe work in the paper we reviewed for class?}
 
-\subsection{Colombo \& Ferrari 2018}
 In their previous work \cite{colombo2018access}, Colombo \& Ferrari proposed a design for an access control manager proxy which can be deployed into an MQTT message broker to enforce
 a set of policies, possibly even causing messages to be rerouted to specific subscribers, held, or dropped entirely per those policy decisions.
 
@@ -90,6 +92,7 @@ pub/sub message broker systems for IoT networks.
 
 It differs from the current state of the art in that most current offerings only go as far as basic
 ACL rulesets.
+{\color{red}needs more}
 
 \section{Timeline}
 Our original estimated timeline was:
@@ -122,7 +125,7 @@ at limiting access to only authorized subscribers who meet the policy restrictio
 the given domains.
 
 \subsection{Experimental Setup}
-We are working in a compartmentalized environment, which allows us to develop the server (MQTT broker) and clients (simulated publishing and subscribing devices) in relative isolation. The clients
+We are working in a compartmentalized environment, which allows us to develop each of our areas of concern---the server (MQTT broker) modifications and the clients (simulated publishing and subscribing devices)---in relative isolation. The clients
 are in Docker containers, allowing them to be instantiated identically as many times as needed in the experimental environment, each running inside its isolated container but able to send and receive network traffic with the server.
 
 This setup allows each team member to separately develop the server and client components away from the actual test environment as well, allowing development and debugging in a way that does not interfere with running experiments.
@@ -130,13 +133,16 @@ This setup allows each team member to separately develop the server and client c
 The server used to perform all the experimental runs, and upon which our performance benchmarks is based, was an Intel\textregistered\ Core\texttrademark\ i9-10980XE (36 cores) running at 4.80\,GHz configured with 128\,Gb of memory.
 It was running the Arch-based Garuda Linux distribution 6.13.7 Zen Linux kernel at the time of the experimental results reported here.
 \section{Conclusions}
+Pending results from experimental work.
 \section{Individual Contributions}
 The efforts were divided between Steve and Jacob along the boundaries of broker and client systems,
 with Steve handling the broker, including the setup of the Mochi MQTT broker and making the access
 control enforcement modifications to it, and Jacob setting up the containerized instances of
 the MQTT client programs acting as publishers and subscribers as well as the orchestration of
 those clients' actions in sending their traffic as part of our experimental runs.
-\section{References}
+
+%
+\bibliography{midqtr-willoughby-olinger}
 \end{document}
 % 2-4 pp
 %Introduction
