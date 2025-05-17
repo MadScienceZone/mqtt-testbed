@@ -10,6 +10,9 @@
 \usepackage[normalem]{ulem}
 \definecolor{ontrack}{HTML}{4A6741}
 \definecolor{behind}{HTML}{8F1402}
+\definecolor{atrisk}{HTML}{888800}
+\newcommand\tuple[1]{\langle#1\rangle}
+\newcommand\var[1]{$\langle$\textit{#1}$\rangle$}
 
 %% The following content must be adapted for the final version
 % paper-specific
@@ -29,7 +32,7 @@
 
 \begin{document}
 \title{IoT Access Control}
-\subtitle{Mid-Quarter Progress Report}
+\subtitle{Mid-Quarter Progress Report \\ 16 May 2025}
 
 %%
 %% The "author" command and its associated commands are used to define the authors and their affiliations.
@@ -77,22 +80,99 @@ building airflow or activate door locks or whatever other device tasks they are 
 \section{Related Work}
 The quest to effectively and efficiently manage subscriber access to published data (as well as the authority for publishers to provide that
 data) is not new, and a number of approaches have been proposed to date. In their 2023 paper \cite{ma2022tbac}, Ma and Yang describe a topic
-oriented model which grants access to certain subscribers according to which topics they are allowed to see.  \sout{Additionally, Xie, Shi, et al. pointed
+oriented model which grants access to certain subscribers according to which topics they are allowed to see.  Additionally, Xie, Shi, et al. pointed
 out \cite{xie2020topic} another important consideration for managing such access controls---dynamic rulesets. Their controls were based on the idea
-of mapping a set of users, devices, and topics via rules as to which actors can publish or subscribe to which topics.}
-{\color{red}maybe work in the paper we reviewed for class?}
+of mapping a set of users, devices, and topics via rules as to which actors can publish or subscribe to which topics.
 
 In their previous work \cite{colombo2018access}, Colombo \& Ferrari proposed a design for an access control manager proxy which can be deployed into an MQTT message broker to enforce
 a set of policies, possibly even causing messages to be rerouted to specific subscribers, held, or dropped entirely per those policy decisions.
 
 
 \section{Project Description}
-Our project seeks to add fine-grained, high-performance access control to MQTT
-pub/sub message broker systems for IoT networks.
+Our project seeks to add fine-grained, high-performance access control to MQTT pub/sub message broker systems for IoT networks.
 
-It differs from the current state of the art in that most current offerings only go as far as basic
-ACL rulesets.
-{\color{red}needs more}
+It differs from the current state of the art in that most current offerings only go as far as basic ACL rulesets.
+We seek to build in particular on the aforementioned prior work such as
+that of Colombo \& Ferrari, although we will more tightly integrate our
+policy enforcement engine with the broker to optimize performance as well as try to achieve a more fine-grained ABAC policy model to
+control subscriber access to published message topics.
+
+\subsection{Access Control Policy Model}
+Access to the published messages is, due to the topic-oriented nature of MQTT IoT traffic, is essentially a fine-grained ABAC policy model where the MQTT topic hierarchy is the primary subject identifier to select the resource being requested by the subscribers.
+
+They are allowed to subscribe to a specific message topic or to a ``wildcard pattern'' which may match a number of topics as they are published and arrive at the broker for distribution to the subscribing clients, which presents some challenges for our policy enforcement engine to take into consideration when resolving our access control rules.
+
+We represent access to a given message as a tuple 
+$$\tuple{t,V,P,m,po}$$
+where $t$ is the MQTT topic pattern under which the message is published via the MQTT broker. Theoretically,
+this could map to an arbitrary kind of resource in the real world but as far as we are concerned and the
+MQTT protocol will see it, these are all ``messages'' being published, routed, and sent to subscribers, so we will
+refer to them as such henceforth. MQTT topics are hierarchical in structure, with slashes separating
+each level in the hierarchy, and special wildcards ``{\tt +}'' and ``{\tt \#}'' may be used to form patterns to match
+many topics in a single rule. For example, ``{\tt bldg1/+/temp/\#}'' might be part of a tuple to specify a rule that controls
+access to messages about temperature readings from all thermostats on all floors of building 1.
+
+The next value, $V$, specifies a set of times during which
+the tuple is considered to be valid, i.e., in effect. $P$ lists a set of access control policies to be enforced predicated on the conditions of the other elements
+of the tuple.\footnote{Having $V$ separate from the policy set $P$ is an optimization step, since a range of times throughout the day is a common use case for IoT systems, and this allows us to set up our approved subscription topic tree to include approved access times which we can continue to use when routing messages rather than have those times cause policy rechecks throughout the day just for their sake.}
+
+The value $m$ specifies contextual information for the rule that is dependent on content of the message payload data itself. 
+
+Finally, the $po$ value names the policy owner in order to document ownership of access management data and for maintenance and audit purposes.
+
+Thus, anyone who wishes to subscribe to receive all messages which are published to topics matching the pattern $t$, for all valid time values $v\in V$, must satisfy all the conditions of all access policies $p\in P$ including any per-message policies indicated by $m$ (if any).
+
+\subsection{Policy Model}
+In our concept of published topics \emph{vis-\`a-vis} access control, we 
+consider the role of the MQTT broker to be to route messages from publishers to subscribers where those messages are in the intersection of the set of topics that match those that each subscriber has requested to receive, and the set of valid times and the set of policies that grant access to the subscriber for those topics.
+
+Expanding further on the definition of the set $P$ of policies in the tuple that defines access to a topic, each element of $P$ is itself a tuple of values $$\tuple{e,c,g,o}$$ where $e$ is an expression including the subject's ABAC attributes relevant to determining the access decision, $c$ is the context in which the subject is operating (i.e.
+the purpose for the access), $g$ is the resulting grant in the event
+the expression is satisfied, and $o$ is the operation for which this
+applies.
+
+The expression $e$ may include the ABAC attribute names. By default, the name alone has a {\tt true} or {\tt false} value if it has boolean type and {\tt true} or {\tt false} value, respectively; the prefix operator {\tt !} negates its boolean value. Thus simple attribute expressions such as ``{\tt MANAGER}'' or ``{\tt !GUEST}'' are easily specified. Logical operators {\tt\&} and {\tt|} may be employed for multiple attributes allowing expressions such as ``{\tt TEAM1|TEAM2}''.
+
+For attributes with non-boolean values, standard comparison operators 
+{\tt<},
+{\tt<=},
+{\tt>},
+{\tt>=},
+{\tt=},
+{\tt!=},
+and numeric and string constant values may be used along with parentheses for grouping (see Fig.~\ref{abac-ops}). 
+\begin{figure}
+    \begin{center}
+    \begin{tabular}{llll}
+    $b$&bool value&
+    $x$\tt=$y$&$x=y$\\
+    \tt!$b$&not bool value&
+    $x$\tt!=$y$&$x\ne y$\\
+    $x$\tt<$y$&$x<y$&
+    $x$\tt<=$y$&$x\le y$\\
+    $x$\tt>$y$&$x>y$&
+    $x$\tt>=$y$&$x\ge y$\\
+    $x$\tt\&$y$&$x\wedge y$&
+    {\tt(}\dots{\tt)}&grouping\\
+    $x$\tt|$y$&$x\vee y$\\
+    \end{tabular}
+    \caption{ABAC Attribute Expression Operators\label{abac-ops}}
+    \end{center}
+\end{figure}
+
+An empty value for $e$ is considered {\tt true} as a special case. If $e$ is {\tt true}, the rule is processed. Otherwise, it is skipped and the next rule in the set is attempted, in order.
+
+The next value in the tuple, $g$, specifies the grant and may be either {\tt ALLOW} or {\tt DENY}. This terminates the
+evaluation of the rule set.
+
+Finally, the $o$ value specifies the operation which is to be granted; this is always {\tt SUBSCRIBE} for now, but may include more operations in our future work.
+
+If the end of the policy list is reached without any of the attribute expressions $e$ evaluating to {\tt true}, then
+{\tt DENY} is assumed by default. This can be amended by adding a catch-all rule that matches all topics for all time ranges for all subjects unconditionally and grants approval.
+
+\subsection{Scope of Investigation}
+For the purposes of our project, we will consider the following set of access rules to be imposed on MQTT traffic and measure the overhead of applying the enforcement of those rules in our broker.
+{\color{red}\dots}
 
 \section{Timeline}
 Our original estimated timeline was:
@@ -102,8 +182,8 @@ Our original estimated timeline was:
 	\item[\color{ontrack}26 Apr] Design for experimental simulated IoT network.
 	\item[\color{ontrack}03 May] Implementation of IoT clients and brokers.
 	\item[\color{behind}10 May] Control runs completed, Mid-Quarter Report.
-	\item[\color{behind}17 May] Add access controls to broker, 2nd experiments.
-	\item[24 May] Additional experiments and scale tests.
+	\item[\color{atrisk}17 May] Add access controls to broker, 2nd experiments.
+	\item[\color{atrisk}24 May] Additional experiments and scale tests.
 	\item[31 May] Complete data analysis.
 	\item[05 Jun] Final Report ready.
 \end{description}
@@ -130,6 +210,83 @@ are in Docker containers, allowing them to be instantiated identically as many t
 
 This setup allows each team member to separately develop the server and client components away from the actual test environment as well, allowing development and debugging in a way that does not interfere with running experiments.
 
+\subsection{Orchestration}
+The operation of the experimental lab is governed by two main scripts.
+
+The launch script will start up the server (MQTT broker) and then the publishers and subscribers according to its configuration.
+
+We then collect the data after the run is complete and analyze the data.
+
+\subsubsection{Configuration}
+The experimental runs are controlled by a JSON file which governs how the clients and servers are configured as well as what the experimental parameters will be. The format of this file and the meaning of these parameters are explained by example below:
+\begin{verbatim}
+{
+	"experiment": {
+		"collectiondir": "path",
+		"jobid": "id",
+		"description": "text..."
+	},
+	"server": {
+		"port": 1883,
+		"protcol": "tcp"
+	},
+	"publishers": [
+		"topic/a/b/c": {
+			"frequency": 10000,
+			"size": 32
+		},
+		"topic/d/e/f": {
+			"frequency": 10000,		
+			"size": 32                      
+		}
+	],
+	"subscribers": [
+		"topic/a/b/c": {
+			"number": 1
+		},
+		"topic/a/#": {
+			"number": 12
+		}
+	]
+}
+\end{verbatim}
+The client side docker container is maintained by this Dockerfile:
+
+\subsubsection{Launch Script}
+The launch script starts up the MQTT server to listen to incoming MQTT traffic on the configured TCP port, then launches
+The client docker containers start with appropriate parameters per its configuration file on port 1883.
+\begin{verbatim}
+FROM python:3.11-alpine
+
+WORKDIR /usr/src/app
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+ENTRYPOINT [ "python", "./simulate/main.py"]
+\end{verbatim}
+The clients write stats about the data they receive to data collection files in the \var{collectiondir}{\tt/}\var{jobid}{\tt/}\var{rawdata} directory under a unique file for each running client instance. The launch script tracks the running clients and manages
+which ones are still running until they're all done and we have all their data.
+
+\subsubsection{Data Collection}
+The containerized clients receive their subscribed data and record their results into a data file with one line per received message in the form:
+
+\begin{center}
+\var{datestamp} \var{topic} \var{bytes\_received}
+\end{center}
+
+The data collection script comes along after the experimental runs are completed and scans all these data files, tabulating the data and
+analyzing the results to show the traffic speed through the broker,
+which we can compare to the speed of the same traffic with and without
+access controls applied. We will also use this to verify that messages
+were or were not filtered as appropriate per the access control policies.
+
+\subsubsection{Extensibility and Updates}
+This is a baseline to get started. As we build out the capabilities of the experimental system we'll add more parameters related to access control to how we launch the clients and server for the experiments we'll run.
+
+\subsection{Hardware Profile}
 The server used to perform all the experimental runs, and upon which our performance benchmarks is based, was an Intel\textregistered\ Core\texttrademark\ i9-10980XE (36 cores) running at 4.80\,GHz configured with 128\,Gb of memory.
 It was running the Arch-based Garuda Linux distribution 6.13.7 Zen Linux kernel at the time of the experimental results reported here.
 \section{Conclusions}
